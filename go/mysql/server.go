@@ -196,6 +196,8 @@ type Listener struct {
 	// connBufferPooling configures if vtgate server pools connection buffers
 	connBufferPooling bool
 
+	maxCnxns int64
+
 	// shutdown indicates that Shutdown method was called.
 	shutdown atomic.Bool
 
@@ -265,6 +267,7 @@ type ListenerConfig struct {
 	ConnWriteTimeout   time.Duration
 	ConnReadBufferSize int
 	ConnBufferPooling  bool
+	MaxCnxns           int64
 }
 
 // NewListenerWithConfig creates new listener using provided config. There are
@@ -291,6 +294,7 @@ func NewListenerWithConfig(cfg ListenerConfig) (*Listener, error) {
 		connWriteTimeout:   cfg.ConnWriteTimeout,
 		connReadBufferSize: cfg.ConnReadBufferSize,
 		connBufferPooling:  cfg.ConnBufferPooling,
+		maxCnxns:           cfg.MaxCnxns,
 	}, nil
 }
 
@@ -305,7 +309,7 @@ func (l *Listener) Accept() {
 
 	for {
 		conn, err := l.listener.Accept()
-		if err != nil {
+		if err != nil || (connCount.Get() > l.maxCnxns && connCount.Get() != -1) {
 			// Close() was probably called.
 			connRefuse.Add(1)
 			return
